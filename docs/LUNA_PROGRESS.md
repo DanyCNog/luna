@@ -2,6 +2,15 @@
 
 > Registo cronológico de decisões, progressos, bloqueios e aprendizagens.
 
+## 2026-04-20 — Fase 1-virtual — 1v.1 Ambiente base ✅
+
+**Estado:** ✅ concluído
+**O quê:** Preparar portátil Kali com Python, venv, Git, dependências de sistema e estrutura de pastas.
+**Porquê:** Base limpa e isolada para construir a Luna-virtual sem interferências.
+**Como foi feito:** Criei ~/luna/ com venv, .gitignore, estrutura de pastas, README. Instalei portaudio19-dev, ffmpeg, libsndfile1, build-essential. Primeiro commit feito.
+**Resultado:** Ambiente pronto. Microfone e altifalantes funcionam. Git versiona o projecto.
+**Notas:** [adiciona aqui se houve alguma surpresa, erro que resolveste, etc.]
+
 **Formato de cada entrada:**
 ```
 ## [DATA] — [Fase] — [Título]
