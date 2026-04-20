@@ -1,0 +1,35 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Modelos descarregados (grandes)
+models/
+*.gguf
+*.bin
+*.onnx
+
+# Áudio temporário
+*.wav
+*.mp3
+
+# Base de dados
+data/
+*.db
+*.sqlite*
+
+# Configurações sensíveis
+secrets/
+*.key
+*.pem
+.env
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
