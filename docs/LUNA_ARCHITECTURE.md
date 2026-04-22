@@ -2,8 +2,8 @@
 
 > Assistente robótica pessoal 100% local, privada e fluida para a família Dany, Linda, Ivy (Samoieda) e Thor (Lulu da Pomerânia).
 
-**Versão:** 0.4 — Fase 1-virtual adicionada  
-**Data:** Abril 2026  
+**Versão:** 0.4 — Fase 1-virtual adicionada
+**Data:** Abril 2026
 **Estado:** A iniciar Fase 1-virtual no Kali
 
 ---
@@ -125,7 +125,7 @@ O AI HAT+ 2 **requer Raspberry Pi OS Trixie** (Debian 13). O suporte foi adicion
 
 ## 5. Arquitectura de hardware (BOM)
 
-> **Compra em fases** (poupança a decorrer).  
+> **Compra em fases** (poupança a decorrer).
 > **Primeira vaga:** Pi 5 16GB + HAT+ 2 + acessórios essenciais (~440€).
 
 ### Vaga 1 — Core essencial (~€440)
@@ -281,7 +281,7 @@ Enquanto o hardware não chega, construímos a Luna **inteira em software** no K
 9. **1v.9 — Olhos animados** (SVG animado visível no teu ecrã, como se fosse o TFT)
 10. **1v.10 — Luna-virtual completa** (tudo integrado, conversa real em PT-PT)
 
-**Duração estimada:** 3-4 semanas a 2-3h/semana.  
+**Duração estimada:** 3-4 semanas a 2-3h/semana.
 **Output:** software pronto para migrar ao Pi em 1 dia quando chegar.
 
 ### Fases seguintes (quando hardware chegar)

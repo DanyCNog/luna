@@ -66,8 +66,8 @@
 
 ## 2026-04-19 — Fase 0 — Estética v1, v2, v3 ✅
 
-**Iteração 1:** capacete + viseira. Queixo grande (mal).  
-**Iteração 2:** sem queixo, paleta azul gelo. Ecrã na vertical (mal).  
+**Iteração 1:** capacete + viseira. Queixo grande (mal).
+**Iteração 2:** sem queixo, paleta azul gelo. Ecrã na vertical (mal).
 **Iteração 3 ✅:** ecrã horizontal 4:3, cabeça lisa sem orelhinhas.
 
 **Decisões estéticas finais:**

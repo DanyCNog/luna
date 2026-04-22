@@ -1,0 +1,20 @@
+# Pre-commit hooks — Luna
+# Documentação: https://pre-commit.com/
+repos:
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: '\.gitignore$|^\.venv/|^models/|^data/|\.secrets\.baseline$'
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace           # limpa espaços no fim de linhas
+      - id: end-of-file-fixer             # garante newline no fim de ficheiros
+      - id: check-yaml                    # valida sintaxe YAML
+      - id: check-added-large-files       # bloqueia ficheiros >500KB
+        args: ['--maxkb=500']
+      - id: check-merge-conflict          # detecta marcadores não resolvidos
+      - id: detect-private-key            # apanha chaves privadas óbvias

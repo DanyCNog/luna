@@ -4,12 +4,15 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Modelos descarregados (grandes)
 models/
 *.gguf
 *.bin
 *.onnx
+*.safetensors
 
 # Áudio temporário
 *.wav
@@ -19,12 +22,20 @@ models/
 data/
 *.db
 *.sqlite*
+!data/.gitkeep
+logs/
+!logs/.gitkeep
 
 # Configurações sensíveis
 secrets/
 *.key
 *.pem
 .env
+*.p12
+id_rsa*
+id_ed25519*
+.env.*
+!.env.example
 
 # Sistema
 .DS_Store
@@ -33,3 +44,16 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# --- Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# --- Dados sensíveis da Luna ---
+config/family.yaml
+config/*.local.yaml
+config/secrets/
+*.secret

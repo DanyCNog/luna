@@ -1,0 +1,38 @@
+# Luna · Configuração familiar (TEMPLATE)
+# ========================================
+# Copia este ficheiro para family.yaml e preenche com os teus dados.
+# O ficheiro family.yaml NÃO é versionado (está no .gitignore).
+
+owner:
+  name: "PrimeiroNome"
+  age: 30
+  role: "Profissão"
+  pronouns: "ele/dele"           # ou "ela/dela", "elu/delu"
+
+partner:
+  name: "NomeParceiro"
+  age: 30
+  role: "Profissão"
+  relationship: "esposa"         # marido, companheiro, namorada, etc.
+  pronouns: "ela/dela"
+
+pets:
+  - name: "NomeCão1"
+    kind: "cão"
+    breed: "Raça"
+    size: "médio"                # anão, pequeno, médio, grande
+    gender: "fêmea"
+  - name: "NomeCão2"
+    kind: "cão"
+    breed: "Raça"
+    size: "anão"
+    gender: "macho"
+
+home:
+  city: "Cidade, País"
+  type: "T3"
+
+luna:
+  wake_word: "Luna"
+  voice_gender: "feminina"
+  language: "pt-PT"
