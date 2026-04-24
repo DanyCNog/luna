@@ -2,6 +2,89 @@
 
 > Registo cronológico de decisões, progressos, bloqueios e aprendizagens.
 
+## 2026-XX-XX — Fase 1-virtual — 1v.4 Voz TTS (Piper) ✅
+
+**Estado:** ✅ concluído
+**O quê:** Piper TTS + voz pt_PT-tugao-medium. Ciclo completo STT→LLM→TTS funcional no Kali.
+**Porquê:** Primeiro momento em que a Luna é audivelmente funcional de ponta a ponta.
+**Como foi feito:**
+- espeak-ng instalado como dependência de sistema
+- piper-tts 1.4.2 instalado no venv (Python 3.13)
+- Voz tugão (PT-PT masculina, 63 MB) descarregada do rhasspy/piper-voices oficial
+- Modelos TTS guardados em models/tts/ (fora do Git via .gitignore)
+- Criado luna/audio/tts.py com classe LunaTTS (synthesize, say, save_to_file)
+- Criado luna/brain/luna_voice_full.py — integração completa
+- Luna saúda ao arrancar e despede-se ao sair
+
+**Resultado:**
+- Qualidade voz tugão: [X/5]
+- Pronúncia de nomes próprios: [bem / com erros]
+- Latência tua_fala→resposta_audio: ~[X]s total
+- Experiência global: [a descrever]
+
+**Decisão:** tugão masculino é temporário. Pesquisa de alternativa feminina PT-PT
+documentada em docs/LUNA_VOICE_RESEARCH.md. Migração para voz feminina planeada
+para sub-fase 1v.4.1 (a decidir: XTTS v2 clonado OU Piper fine-tuned).
+
+**Notas:**
+- No Pi 5 o Piper deve ficar rápido também (é leve, só 63 MB).
+- `LUNA_VOICE_RESEARCH.md` contém plano detalhado para voz feminina futura.
+- Questão em aberto: gravar voz de referência com Linda (consentimento pendente).
+
+## 2026-04-22 — Fase 1-virtual — 1v.3 Voz STT (Whisper) ✅
+
+**Estado:** ✅ concluído
+**O quê:** Speech-to-text local com faster-whisper + Whisper medium em PT. Voice chat integrado (STT → LLM Gemma 4 E4B) funcional no Kali.
+**Porquê:** A Luna passa a ouvir-me. Validação de qualidade STT em PT-PT antes de adicionar TTS (1v.4).
+**Como foi feito:**
+- Instaladas bibliotecas: sounddevice, numpy, faster-whisper (compatível com Python 3.13)
+- Criado módulo `luna/audio/stt.py` com classe LunaSTT reutilizável
+- Criado `luna/brain/luna_voice_chat.py` que liga microfone → Whisper → Ollama
+- Modelo Whisper medium (~1.5 GB) descarregado para ~/.cache/huggingface/
+- VAD filter activo (filtra silêncio/ruído automático)
+- Detecção de silêncio por RMS (<0.003)
+
+**Resultado:**
+- Precisão geral em PT-PT: [X/5]
+- Nomes próprios (Linda/Ivy/Thor): [acertou? com que erros?]
+- Tempo médio de transcrição 5s áudio: [X segundos]
+- Acentuação: [bem/mal]
+- [outras notas práticas]
+
+**Decisão:** Whisper `medium` fica como primário no Kali. No Pi 5, testar `small` primeiro (465 MB) se medium for demasiado lento.
+
+**Notas:**
+- Microfone interno do portátil continua estragado — uso fones USB.
+- No Pi 5, o Whisper vai correr no AI HAT+ 2 (Hailo), não no CPU.
+- A escrita directa no histórico do LLM assume que a transcrição é perfeita — se erro, o LLM vê texto errado. Podemos adicionar edição/confirmação manual no futuro.
+
+## 2026-04-21 — Fase 1-virtual — 1v.2 LLM local funcional ✅
+
+**Estado:** ✅ concluído
+**O quê:** Luna a pensar em PT-PT localmente no Kali. Ollama + Qwen 2.5 3B + Gemma 4 E4B instalados. Script `luna_chat.py` funcional com streaming, histórico, e system prompt com dados familiares externos (YAML). Pre-commit hook com detect-secrets a proteger contra commits acidentais de segredos.
+**Porquê:** Validar arquitectura de conversa antes de hardware. Separar dados pessoais do código desde o início.
+**Como foi feito:**
+- Ollama instalado via script oficial; serviço systemd com fix de permissões em `/usr/share/ollama`
+- Modelos descarregados: `qwen2.5:3b` (1.9GB), `gemma4:e4b` (9.6GB)
+- Biblioteca Python `ollama` actualizada para 0.5.x (suporte para `think=False`)
+- `luna_chat.py` com `streaming`, `keep_alive=2h`, opções geração tunadas
+- System prompt reforçado: PT-PT obrigatório, tratamento por "tu", sem reasoning visível
+- Família movida para `config/family.yaml` (fora do Git) com `family.example.yaml` público
+- `.gitignore` reforçado contra chaves, .env, dados pessoais
+- Pre-commit hooks: detect-secrets, whitespace, YAML, large files, merge conflicts, private keys
+
+**Resultado:**
+- Gemma 4 E4B: melhor PT-PT. Lento a arrancar (~25s), depois fluente em interacções seguintes.
+- Qwen 2.5 3B: PT-PT mais básico, mas muito mais rápido.
+- **Decisão primário no Kali:** Gemma 4 E4B.
+- **Hipótese a testar no Pi 5:** Gemma 4 E2B (ainda não testado) pode ser ideal — qualidade Gemma + velocidade próxima de Qwen.
+
+**Notas e avisos para o futuro:**
+- **No Pi 5**, usar `OLLAMA_KEEP_ALIVE=-1` (infinito) para eliminar custo de arranque.
+- **Testar Gemma 4 E2B no Pi** como candidato primário principal.
+- `config/family.yaml` contém dados sensíveis — NUNCA commitar.
+- Pre-commit hook activo: cada `git commit` passa por detect-secrets automaticamente.
+
 ## 2026-04-20 — Fase 1-virtual — 1v.1 Ambiente base ✅
 
 **Estado:** ✅ concluído
