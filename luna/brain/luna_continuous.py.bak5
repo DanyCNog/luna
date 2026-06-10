@@ -4,8 +4,8 @@ Luna · Continuous (Always-On com Escuta Inteligente)
 Sem wake word. A Luna escuta sempre, mas só responde quando és tu (ou a Linda)
 a chamá-la pelo nome em conversa natural.
 
-Sub-fase: 1v.5 + streaming TTS (B2) + supervisor (B3) + fallback offline (B4)
-+ janela de seguimento de 15s (B5) + contexto temporal dinâmico (B6).
+Sub-fase: 1v.5 + streaming TTS (B2) + supervisor (B3) + fallback offline (B4).
+Se o Ollama estiver em baixo, a Luna não fica muda: responde com presença.
 """
 
 from __future__ import annotations
@@ -37,7 +37,6 @@ from luna.brain.luna_chat import (  # noqa: E402
 )
 from luna.core.fallback import resposta_offline  # noqa: E402
 from luna.core.supervisor import log, protegido  # noqa: E402
-from luna.personality.contexto import contexto_temporal  # noqa: E402
 
 console = Console()
 
@@ -46,15 +45,11 @@ FALLBACK_LLM = "Tive um problema a pensar. Podes repetir?"
 # Excepções que significam "o Ollama está inalcançável"
 ERROS_LIGACAO = (httpx.ConnectError, httpx.ConnectTimeout, ConnectionError)
 
-# Janela de seguimento (B5): segundos de atenção pós-resposta
-ATENCAO_SEGUNDOS = float(os.environ.get("LUNA_ATTENTION_SECS", "15"))
-
 
 def build_panel(model: str, owner_name: str) -> Panel:
     return Panel.fit(
         f"[bold cyan]Luna · Escuta Contínua[/bold cyan]\n"
-        f"[dim]LLM: {model} · streaming · supervisor · janela {ATENCAO_SEGUNDOS:.0f}s "
-        f"· contexto temporal[/dim]\n"
+        f"[dim]LLM: {model} · streaming TTS · supervisor · fallback offline[/dim]\n"
         f"[dim]Olá, {owner_name}. Diz 'Luna' em conversa para me chamares. "
         f"Ctrl+C para terminar.[/dim]",
         border_style="cyan",
@@ -73,14 +68,6 @@ def main() -> None:
     tts = LunaTTS()
     listener = LunaListener(stt=stt)
 
-    def abrir_janela() -> None:
-        """B5: após falar, a Luna fica atenta sem precisar de 'Luna'."""
-        listener.attention_until = time.monotonic() + ATENCAO_SEGUNDOS
-        console.print(
-            f"[dim][atenta {ATENCAO_SEGUNDOS:.0f}s — podes continuar sem "
-            f"dizer 'Luna'][/dim]"
-        )
-
     # Saudação inicial discreta (protegida: se o TTS falhar, fica no log)
     greeting = f"Estou aqui, {owner_name}."
     console.print(f"\n[bold magenta]Luna[/bold magenta] {greeting}")
@@ -90,17 +77,6 @@ def main() -> None:
 
     def responder(request: str) -> None:
         """LLM em streaming + TTS por frase. Falhas não saem daqui."""
-        # B6: refrescar o system prompt com o contexto temporal actual
-        try:
-            history[0] = {
-                "role": "system",
-                "content": system_prompt
-                + "\n\nCONTEXTO TEMPORAL:\n"
-                + contexto_temporal(),
-            }
-        except Exception:  # noqa: BLE001
-            log.error("Falha no contexto temporal:\n%s", traceback.format_exc())
-
         history.append({"role": "user", "content": request})
 
         streamer = SentenceStreamer(tts)
@@ -156,7 +132,6 @@ def main() -> None:
             frase = resposta_offline()
             console.print(f"[bold magenta]Luna[/bold magenta] {frase}")
             protegido("tts", tts.say, frase)
-            abrir_janela()
             return
 
         if falhou and streamer.frases_enviadas == 0:
@@ -164,7 +139,6 @@ def main() -> None:
             history.pop()
             console.print(f"[bold magenta]Luna[/bold magenta] {FALLBACK_LLM}")
             protegido("tts", tts.say, FALLBACK_LLM)
-            abrir_janela()
             return
 
         total = time.monotonic() - t0
@@ -173,8 +147,6 @@ def main() -> None:
                 f"[dim]  1ª frase no TTS   {t_primeira_frase:6.2f}s\n"
                 f"  resposta completa {total:6.2f}s[/dim]"
             )
-
-        abrir_janela()  # B5: resposta dada, atenção aberta
 
     def on_mention(event: ListenerEvent) -> None:
         """Callback da escuta. Blindado: nenhuma excepção sobe daqui."""
@@ -188,7 +160,6 @@ def main() -> None:
                 ack = f"Sim, {owner_name}?"
                 console.print(f"[bold magenta]Luna[/bold magenta] {ack}")
                 protegido("tts", tts.say, ack)
-                abrir_janela()  # B5: "Luna?" → "Sim?" → pergunta sem 'Luna'
                 return
 
             responder(request)
