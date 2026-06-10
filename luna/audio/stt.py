@@ -28,7 +28,7 @@ SAMPLE_RATE = 16000
 class STTConfig:
     """Configuração do Speech-to-Text da Luna."""
 
-    model_size: str = os.environ.get("LUNA_WHISPER_MODEL", "medium")
+    model_size: str = os.environ.get("LUNA_WHISPER_MODEL", "small")
     language: str = "pt"
     device: str = "cpu"          # "cuda" se houvesse GPU dedicada
     compute_type: str = "int8"    # int8 = rápido no CPU; float16 para GPU
