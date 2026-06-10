@@ -4,18 +4,20 @@ Luna · Continuous (Always-On com Escuta Inteligente)
 Sem wake word. A Luna escuta sempre, mas só responde quando és tu (ou a Linda)
 a chamá-la pelo nome em conversa natural.
 
-Sub-fase: 1v.5 + cronómetro (A0) + streaming TTS por frase (B2).
-A Luna começa a falar mal a primeira frase do LLM esteja completa.
+Sub-fase: 1v.5 (Escuta Contínua Inteligente) + cronómetro de latência (A0).
 
 Uso:
     python luna/brain/luna_continuous.py
+
+Variáveis de ambiente:
+    LUNA_MODEL, LUNA_WHISPER_MODEL, LUNA_TTS_MODEL_PATH,
+    LUNA_FAMILY_CONFIG, LUNA_VAD_THRESHOLD
 """
 
 from __future__ import annotations
 
 import os
 import sys
-import time
 from pathlib import Path
 
 os.environ.setdefault("OLLAMA_KEEP_ALIVE", "2h")
@@ -27,7 +29,6 @@ from rich.console import Console
 from rich.panel import Panel
 
 from luna.audio.listener import LunaListener, ListenerEvent  # noqa: E402
-from luna.audio.sentence_stream import SentenceStreamer  # noqa: E402
 from luna.audio.stt import LunaSTT  # noqa: E402
 from luna.audio.tts import LunaTTS  # noqa: E402
 from luna.brain.luna_chat import (  # noqa: E402
@@ -36,6 +37,7 @@ from luna.brain.luna_chat import (  # noqa: E402
     build_system_prompt,
     load_family,
 )
+from luna.utils.timing import StageTimer  # noqa: E402
 
 console = Console()
 
@@ -43,7 +45,7 @@ console = Console()
 def build_panel(model: str, owner_name: str) -> Panel:
     return Panel.fit(
         f"[bold cyan]Luna · Escuta Contínua[/bold cyan]\n"
-        f"[dim]LLM: {model} · streaming TTS por frase[/dim]\n"
+        f"[dim]LLM: {model}[/dim]\n"
         f"[dim]Olá, {owner_name}. Diz 'Luna' em conversa para me chamares. "
         f"Ctrl+C para terminar.[/dim]",
         border_style="cyan",
@@ -83,17 +85,14 @@ def main() -> None:
 
         history.append({"role": "user", "content": request})
 
-        # Streaming: LLM produz, TTS fala em paralelo, frase a frase
-        streamer = SentenceStreamer(tts)
-        streamer.start()
+        # Cronómetro de latência (Passo A0)
+        timer = StageTimer()
 
+        # LLM
         console.print("\n[bold magenta]Luna[/bold magenta] ", end="")
         response_text = ""
-        buffer = ""
-        t0 = time.monotonic()
-        t_primeira_frase: float | None = None
-
         try:
+            timer.start("llm")
             stream = chat(
                 model=MODEL,
                 messages=history,
@@ -104,27 +103,19 @@ def main() -> None:
             for chunk in stream:
                 piece = chunk["message"]["content"]
                 response_text += piece
-                buffer += piece
                 console.print(piece, end="", style="white")
-
-                buffer = streamer.feed(buffer)
-                if t_primeira_frase is None and streamer.frases_enviadas > 0:
-                    t_primeira_frase = time.monotonic() - t0
-
             console.print()
             history.append({"role": "assistant", "content": response_text})
-        except Exception as exc:  # noqa: BLE001
-            console.print(f"\n[bold red]Erro LLM:[/bold red] {exc}")
-        finally:
-            # Fala o que restar e ESPERA a última frase acabar de soar
-            streamer.finish(buffer)
 
-        total = time.monotonic() - t0
-        if t_primeira_frase is not None:
-            console.print(
-                f"[dim]  1ª frase no TTS   {t_primeira_frase:6.2f}s\n"
-                f"  resposta completa {total:6.2f}s[/dim]"
-            )
+            # Falar
+            timer.start("tts")
+            tts.say(response_text)
+            timer.stop()
+
+            console.print(f"[dim]{timer.report()}[/dim]")
+        except Exception as exc:  # noqa: BLE001
+            timer.stop()
+            console.print(f"\n[bold red]Erro LLM:[/bold red] {exc}")
 
     try:
         listener.listen(on_mention)
