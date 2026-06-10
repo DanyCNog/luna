@@ -18,3 +18,12 @@ repos:
         args: ['--maxkb=500']
       - id: check-merge-conflict          # detecta marcadores não resolvidos
       - id: detect-private-key            # apanha chaves privadas óbvias
+
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: pip-audit (CVEs em dependencias)
+        entry: pip-audit
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
