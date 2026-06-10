@@ -10,7 +10,7 @@ Dados familiares vêm de config/family.yaml (não versionado).
 Se o ficheiro não existir, usa config/family.example.yaml.
 
 Configuração via variáveis de ambiente (opcional):
-    LUNA_MODEL=gemma4:e4b        # modelo a usar
+    LUNA_MODEL=gemma4:e2b        # modelo a usar
     OLLAMA_KEEP_ALIVE=2h         # tempo de modelo quente em RAM
     LUNA_FAMILY_CONFIG=caminho   # override do ficheiro YAML
 """
@@ -34,10 +34,10 @@ console = Console()
 # CONFIGURAÇÃO
 # ============================================================
 # Candidatos de modelos validados:
-#   "gemma4:e4b"   → qualidade PT-PT superior, mais lento (~5 GB RAM)
+#   "gemma4:e2b"   → qualidade PT-PT superior, mais lento (~5 GB RAM)
 #   "gemma4:e2b"   → qualidade PT-PT boa, rápido, ideal para Pi 5 (~3 GB RAM)
 #   "qwen2.5:3b"   → rápido, PT-PT decente (~2 GB RAM)
-MODEL = os.environ.get("LUNA_MODEL", "gemma4:e4b")
+MODEL = os.environ.get("LUNA_MODEL", "gemma4:e2b")
 
 GENERATION_OPTIONS = {
     "temperature": 0.7,
