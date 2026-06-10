@@ -4,8 +4,9 @@ Luna · Continuous (Always-On com Escuta Inteligente)
 Sem wake word. A Luna escuta sempre, mas só responde quando és tu (ou a Linda)
 a chamá-la pelo nome em conversa natural.
 
-Sub-fase: 1v.5 + streaming TTS (B2) + supervisor (B3) + fallback offline (B4).
-Se o Ollama estiver em baixo, a Luna não fica muda: responde com presença.
+Sub-fase: 1v.5 + streaming TTS (B2) + supervisor de falha graciosa (B3).
+O loop NUNCA morre: cada componente falha isoladamente, fica em logs/luna.log,
+e a Luna responde com uma frase de recurso.
 """
 
 from __future__ import annotations
@@ -20,7 +21,6 @@ os.environ.setdefault("OLLAMA_KEEP_ALIVE", "2h")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import httpx  # noqa: E402  (dependência do cliente ollama)
 from ollama import chat  # noqa: E402
 from rich.console import Console
 from rich.panel import Panel
@@ -35,21 +35,17 @@ from luna.brain.luna_chat import (  # noqa: E402
     build_system_prompt,
     load_family,
 )
-from luna.core.fallback import resposta_offline  # noqa: E402
 from luna.core.supervisor import log, protegido  # noqa: E402
 
 console = Console()
 
 FALLBACK_LLM = "Tive um problema a pensar. Podes repetir?"
 
-# Excepções que significam "o Ollama está inalcançável"
-ERROS_LIGACAO = (httpx.ConnectError, httpx.ConnectTimeout, ConnectionError)
-
 
 def build_panel(model: str, owner_name: str) -> Panel:
     return Panel.fit(
         f"[bold cyan]Luna · Escuta Contínua[/bold cyan]\n"
-        f"[dim]LLM: {model} · streaming TTS · supervisor · fallback offline[/dim]\n"
+        f"[dim]LLM: {model} · streaming TTS · supervisor activo[/dim]\n"
         f"[dim]Olá, {owner_name}. Diz 'Luna' em conversa para me chamares. "
         f"Ctrl+C para terminar.[/dim]",
         border_style="cyan",
@@ -88,7 +84,6 @@ def main() -> None:
         t0 = time.monotonic()
         t_primeira_frase: float | None = None
         falhou = False
-        offline = False
 
         try:
             stream = chat(
@@ -110,33 +105,17 @@ def main() -> None:
 
             console.print()
             history.append({"role": "assistant", "content": response_text})
-        except ERROS_LIGACAO:
-            offline = True
-            log.warning("Ollama indisponível — resposta offline")
-            console.print(
-                "\n[bold yellow](Ollama em baixo — resposta offline)[/bold yellow]"
-            )
         except Exception:  # noqa: BLE001
             falhou = True
             log.error("Falha em llm:\n%s", traceback.format_exc())
-            console.print(
-                "\n[bold red](falha no LLM — registada no log)[/bold red]"
-            )
+            console.print("\n[bold red](falha no LLM — registada no log)[/bold red]")
         finally:
             # Fala o que já saiu e espera a última frase acabar de soar
             protegido("tts", streamer.finish, buffer)
 
-        if offline:
-            # O cérebro está em baixo: presença em vez de silêncio
-            history.pop()  # remove o pedido sem resposta do histórico
-            frase = resposta_offline()
-            console.print(f"[bold magenta]Luna[/bold magenta] {frase}")
-            protegido("tts", tts.say, frase)
-            return
-
         if falhou and streamer.frases_enviadas == 0:
-            # O LLM caiu sem dizer nada: frase de recurso genérica
-            history.pop()
+            # O LLM caiu sem dizer nada: frase de recurso
+            history.pop()  # remove o pedido sem resposta do histórico
             console.print(f"[bold magenta]Luna[/bold magenta] {FALLBACK_LLM}")
             protegido("tts", tts.say, FALLBACK_LLM)
             return
