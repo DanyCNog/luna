@@ -1,6 +1,6 @@
 """
-Luna · Continuous Listener (silero-vad v6.x + timings + filtro B1 + janela B5)
-==============================================================================
+Luna · Continuous Listener (revisto para silero-vad v6.x + diagnóstico de timings)
+==================================================================================
 Escuta contínua inteligente em 2 níveis:
 
 NÍVEL 1: Silero VAD detecta presença de voz humana (PyTorch backend, ~5% CPU).
@@ -9,13 +9,7 @@ NÍVEL 2: Quando há voz, Whisper transcreve em rajadas e procura "Luna".
 Custo de CPU baixo em silêncio. Sobe apenas quando há fala.
 Privacidade: áudio nunca persistido, transcrições descartadas em ms se sem menção.
 
-Novidades desta versão:
-- Filtro de transcrição barata (B1): descarta lixo antes do mention detector.
-- Janela de seguimento (B5, ADORMECIDA): `attention_until` permite responder
-  sem "Luna" durante N segundos após uma resposta. Fica inactiva (0.0) até
-  o luna_continuous a activar na sub-fase B5.
-- Anti-eco: após cada callback, a fila de áudio é esvaziada e o VAD é
-  reiniciado, para a Luna não processar a própria voz nem áudio antigo.
+Esta versão imprime timings de cada etapa para diagnóstico de latência.
 """
 
 from __future__ import annotations
@@ -36,7 +30,6 @@ import sounddevice as sd
 import torch
 from silero_vad import VADIterator, load_silero_vad
 
-from luna.audio.filters import transcricao_util
 from luna.audio.mention import detect_mention
 from luna.audio.stt import LunaSTT
 
@@ -85,24 +78,10 @@ class LunaListener:
         self._audio_queue: queue.Queue[np.ndarray] = queue.Queue()
         self._stop = False
 
-        # Janela de seguimento (B5). Timestamp monotónico até ao qual a Luna
-        # responde SEM precisar de "Luna". 0.0 = desligada. Quem a activa é o
-        # luna_continuous, após cada resposta falada.
-        self.attention_until = 0.0
-
     def _audio_callback(self, indata, frames, time_info, status) -> None:  # noqa: ANN001
         if status:
             pass
         self._audio_queue.put(indata.copy().flatten().astype(np.float32))
-
-    def _drain_audio(self) -> None:
-        """Esvazia a fila e reinicia o VAD (anti-eco pós-resposta)."""
-        try:
-            while True:
-                self._audio_queue.get_nowait()
-        except queue.Empty:
-            pass
-        self.vad_iterator.reset_states()
 
     def listen(self, on_mention: Callable[[ListenerEvent], None]) -> None:
         """Loop principal. Chama `on_mention` cada vez que detecta 'Luna'."""
@@ -202,31 +181,23 @@ class LunaListener:
         if not text:
             return
 
-        # Filtro de transcrição barata (B1): descarta lixo antes de gastar CPU
-        if not transcricao_util(text):
-            print("[timing] filtro=✗ transcrição descartada (lixo)", flush=True)
-            return
-
-        # Janela de seguimento (B5): activa se attention_until estiver no futuro
-        em_atencao = time.monotonic() < self.attention_until
-
         # Mention detector — sempre rápido (<10ms)
         t0 = time.time()
         result = detect_mention(text)
         t_mention = (time.time() - t0) * 1000
 
-        if result.mentioned or em_atencao:
-            origem = "✓ menção detectada" if result.mentioned else "✓ seguimento (janela)"
-            print(f"[timing] mention={t_mention:.0f}ms  {origem}", flush=True)
+        if result.mentioned:
+            print(
+                f"[timing] mention={t_mention:.0f}ms  ✓ menção detectada",
+                flush=True,
+            )
             event = ListenerEvent(
-                request=result.request_text if result.mentioned else text,
+                request=result.request_text,
                 full_transcription=text,
                 confidence=1.0,
                 timestamp=start_time,
             )
             on_mention(event)
-            # Anti-eco: descartar tudo o que o micro apanhou durante a resposta
-            self._drain_audio()
         else:
             print(
                 f"[timing] mention={t_mention:.0f}ms  ✗ sem menção (descarto)",
