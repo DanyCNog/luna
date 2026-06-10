@@ -4,9 +4,11 @@ Luna · Continuous (Always-On com Escuta Inteligente)
 Sem wake word. A Luna escuta sempre, mas só responde quando és tu (ou a Linda)
 a chamá-la pelo nome em conversa natural.
 
-Sub-fase: 1v.5 + streaming TTS (B2) + supervisor de falha graciosa (B3).
-O loop NUNCA morre: cada componente falha isoladamente, fica em logs/luna.log,
-e a Luna responde com uma frase de recurso.
+Sub-fase: 1v.5 + cronómetro (A0) + streaming TTS por frase (B2).
+A Luna começa a falar mal a primeira frase do LLM esteja completa.
+
+Uso:
+    python luna/brain/luna_continuous.py
 """
 
 from __future__ import annotations
@@ -14,7 +16,6 @@ from __future__ import annotations
 import os
 import sys
 import time
-import traceback
 from pathlib import Path
 
 os.environ.setdefault("OLLAMA_KEEP_ALIVE", "2h")
@@ -35,17 +36,14 @@ from luna.brain.luna_chat import (  # noqa: E402
     build_system_prompt,
     load_family,
 )
-from luna.core.supervisor import log, protegido  # noqa: E402
 
 console = Console()
-
-FALLBACK_LLM = "Tive um problema a pensar. Podes repetir?"
 
 
 def build_panel(model: str, owner_name: str) -> Panel:
     return Panel.fit(
         f"[bold cyan]Luna · Escuta Contínua[/bold cyan]\n"
-        f"[dim]LLM: {model} · streaming TTS · supervisor activo[/dim]\n"
+        f"[dim]LLM: {model} · streaming TTS por frase[/dim]\n"
         f"[dim]Olá, {owner_name}. Diz 'Luna' em conversa para me chamares. "
         f"Ctrl+C para terminar.[/dim]",
         border_style="cyan",
@@ -64,17 +62,28 @@ def main() -> None:
     tts = LunaTTS()
     listener = LunaListener(stt=stt)
 
-    # Saudação inicial discreta (protegida: se o TTS falhar, fica no log)
+    # Saudação inicial discreta
     greeting = f"Estou aqui, {owner_name}."
     console.print(f"\n[bold magenta]Luna[/bold magenta] {greeting}")
-    protegido("tts", tts.say, greeting)
+    tts.say(greeting)
 
     history = [{"role": "system", "content": system_prompt}]
 
-    def responder(request: str) -> None:
-        """LLM em streaming + TTS por frase. Falhas não saem daqui."""
+    def on_mention(event: ListenerEvent) -> None:
+        """Callback chamado pela escuta cada vez que 'Luna' é dita."""
+        request = event.request.strip()
+        console.print(f"\n[dim italic]> {event.full_transcription}[/dim italic]")
+
+        if not request:
+            # Foi mencionada mas não se segue pedido (ex: "Luna?", "olá Luna")
+            ack = f"Sim, {owner_name}?"
+            console.print(f"[bold magenta]Luna[/bold magenta] {ack}")
+            tts.say(ack)
+            return
+
         history.append({"role": "user", "content": request})
 
+        # Streaming: LLM produz, TTS fala em paralelo, frase a frase
         streamer = SentenceStreamer(tts)
         streamer.start()
 
@@ -83,7 +92,6 @@ def main() -> None:
         buffer = ""
         t0 = time.monotonic()
         t_primeira_frase: float | None = None
-        falhou = False
 
         try:
             stream = chat(
@@ -105,20 +113,11 @@ def main() -> None:
 
             console.print()
             history.append({"role": "assistant", "content": response_text})
-        except Exception:  # noqa: BLE001
-            falhou = True
-            log.error("Falha em llm:\n%s", traceback.format_exc())
-            console.print("\n[bold red](falha no LLM — registada no log)[/bold red]")
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"\n[bold red]Erro LLM:[/bold red] {exc}")
         finally:
-            # Fala o que já saiu e espera a última frase acabar de soar
-            protegido("tts", streamer.finish, buffer)
-
-        if falhou and streamer.frases_enviadas == 0:
-            # O LLM caiu sem dizer nada: frase de recurso
-            history.pop()  # remove o pedido sem resposta do histórico
-            console.print(f"[bold magenta]Luna[/bold magenta] {FALLBACK_LLM}")
-            protegido("tts", tts.say, FALLBACK_LLM)
-            return
+            # Fala o que restar e ESPERA a última frase acabar de soar
+            streamer.finish(buffer)
 
         total = time.monotonic() - t0
         if t_primeira_frase is not None:
@@ -127,42 +126,11 @@ def main() -> None:
                 f"  resposta completa {total:6.2f}s[/dim]"
             )
 
-    def on_mention(event: ListenerEvent) -> None:
-        """Callback da escuta. Blindado: nenhuma excepção sobe daqui."""
-        try:
-            request = event.request.strip()
-            console.print(
-                f"\n[dim italic]> {event.full_transcription}[/dim italic]"
-            )
-
-            if not request:
-                ack = f"Sim, {owner_name}?"
-                console.print(f"[bold magenta]Luna[/bold magenta] {ack}")
-                protegido("tts", tts.say, ack)
-                return
-
-            responder(request)
-        except Exception:  # noqa: BLE001
-            log.error("Falha não classificada em on_mention:\n%s",
-                      traceback.format_exc())
-
-    # Loop exterior: se o próprio listener cair (ex.: microfone desligado),
-    # regista, espera 2s e tenta de novo. Só o Ctrl+C termina a Luna.
-    while True:
-        try:
-            listener.listen(on_mention)
-            break  # listener terminou de forma limpa (stop())
-        except KeyboardInterrupt:
-            console.print(f"\n[dim]A terminar. Até logo, {owner_name}.[/dim]")
-            protegido("tts", tts.say, f"Até logo, {owner_name}.")
-            break
-        except Exception:  # noqa: BLE001
-            log.error("Falha no listener:\n%s", traceback.format_exc())
-            console.print(
-                "[bold red](falha no listener — registada; a tentar de novo "
-                "em 2s)[/bold red]"
-            )
-            time.sleep(2)
+    try:
+        listener.listen(on_mention)
+    except KeyboardInterrupt:
+        console.print(f"\n[dim]A terminar. Até logo, {owner_name}.[/dim]")
+        tts.say(f"Até logo, {owner_name}.")
 
 
 if __name__ == "__main__":
